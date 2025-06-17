@@ -1,0 +1,24 @@
+version: 0.2
+
+env:
+  variables:
+    FRONTEND_IMAGE_JSON: "frontend/imageDetail.json"
+    BACKEND_IMAGE_JSON: "backend/imageDetail.json"
+
+phases:
+  install:
+    runtime-versions:
+      python: 3.x
+  pre_build:
+    commands:
+      - aws eks update-kubeconfig --region us-east-1 --name three-tier
+  build:
+    commands:
+      - BACKEND_IMAGE_URI=$(cat $BACKEND_IMAGE_JSON | jq -r '.ImageURI')
+      - FRONTEND_IMAGE_URI=$(cat $FRONTEND_IMAGE_JSON | jq -r '.ImageURI')
+
+      - sed -i "s|IMAGE_URI_BACKEND|$BACKEND_IMAGE_URI|" Kubernetes-Manifests-file/Backend/deployment.yaml
+      - kubectl apply -f Kubernetes-Manifests-file/Backend
+
+      - sed -i "s|IMAGE_URI_FRONTEND|$FRONTEND_IMAGE_URI|" Kubernetes-Manifests-file/Frontend/deployment.yaml
+      - kubectl apply -f Kubernetes-Manifests-file/Frontend
