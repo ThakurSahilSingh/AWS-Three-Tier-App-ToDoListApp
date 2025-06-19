@@ -3,6 +3,7 @@ version: 0.2
 phases:
   pre_build:
     commands:
+      - cd Application-Code/frontend
       - REPOSITORY_URI=137068239975.dkr.ecr.us-east-1.amazonaws.com/frontend
       - IMAGE_TAG=$(echo $CODEBUILD_RESOLVED_SOURCE_VERSION | cut -c 1-7)
       - aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin $REPOSITORY_URI
@@ -12,8 +13,7 @@ phases:
   post_build:
     commands:
       - docker push $REPOSITORY_URI:$IMAGE_TAG
-      - printf '{"ImageURI":"%s"}' $REPOSITORY_URI:$IMAGE_TAG > imageDetail.json
-
+      - printf '{"ImageURI":"%s"}' $REPOSITORY_URI:$IMAGE_TAG > ../../frontend-imageDetail.json
 artifacts:
   files:
-    - imageDetail.json
+    - frontend-imageDetail.json

@@ -1,25 +1,20 @@
-const mongoose = require("mongoose");
+require('dotenv').config();
+const { Sequelize } = require('sequelize');
 
-module.exports = async () => {
+const sequelize = new Sequelize('tasksdb', process.env.DB_USER, process.env.DB_PASS, {
+    host: process.env.DB_HOST,
+    dialect: 'mysql',
+    logging: false
+});
+
+const connectDB = async () => {
     try {
-        const connectionParams = {
-            // user: process.env.MONGO_USERNAME,
-            // pass: process.env.MONGO_PASSWORD,
-            useNewUrlParser: true,
-            // useCreateIndex: true,
-            useUnifiedTopology: true,
-        };
-        const useDBAuth = process.env.USE_DB_AUTH || false;
-        if(useDBAuth){
-            connectionParams.user = process.env.MONGO_USERNAME;
-            connectionParams.pass = process.env.MONGO_PASSWORD;
-        }
-        await mongoose.connect(
-           process.env.MONGO_CONN_STR,
-           connectionParams
-        );
-        console.log("Connected to database.");
+        await sequelize.authenticate();
+        console.log("Connected to MySQL (RDS) database.");
+        await sequelize.sync(); // Optional: auto-create tables based on models
     } catch (error) {
         console.log("Could not connect to database.", error);
     }
 };
+
+module.exports = { sequelize, connectDB };

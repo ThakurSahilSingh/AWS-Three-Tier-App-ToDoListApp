@@ -4,7 +4,7 @@ const router = express.Router();
 
 router.post("/", async (req, res) => {
     try {
-        const task = await new Task(req.body).save();
+        const task = await Task.create(req.body);
         res.send(task);
     } catch (error) {
         res.send(error);
@@ -13,7 +13,7 @@ router.post("/", async (req, res) => {
 
 router.get("/", async (req, res) => {
     try {
-        const tasks = await Task.find();
+        const tasks = await Task.findAll();
         res.send(tasks);
     } catch (error) {
         res.send(error);
@@ -22,11 +22,11 @@ router.get("/", async (req, res) => {
 
 router.put("/:id", async (req, res) => {
     try {
-        const task = await Task.findOneAndUpdate(
-            { _id: req.params.id },
-            req.body
-        );
-        res.send(task);
+        await Task.update(req.body, {
+            where: { id: req.params.id }
+        });
+        const updatedTask = await Task.findByPk(req.params.id);
+        res.send(updatedTask);
     } catch (error) {
         res.send(error);
     }
@@ -34,8 +34,13 @@ router.put("/:id", async (req, res) => {
 
 router.delete("/:id", async (req, res) => {
     try {
-        const task = await Task.findByIdAndDelete(req.params.id);
-        res.send(task);
+        const task = await Task.findByPk(req.params.id);
+        if (task) {
+            await task.destroy();
+            res.send(task);
+        } else {
+            res.status(404).send({ message: "Task not found" });
+        }
     } catch (error) {
         res.send(error);
     }

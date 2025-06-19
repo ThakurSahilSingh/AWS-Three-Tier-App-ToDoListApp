@@ -1,0 +1,59 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: api
+  namespace: three-tier
+  labels:
+    role: api
+    env: demo
+spec:
+  replicas: 2
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 25%
+  selector:
+    matchLabels:
+      role: api
+  template:
+    metadata:
+      labels:
+        role: api
+    spec:
+      imagePullSecrets:
+        - name: ecr-registry-secret
+      containers:
+        - name: api
+          image: IMAGE_URI_BACKEND
+          imagePullPolicy: Always
+          env:
+            - name: DB_USER
+              valueFrom:
+                secretKeyRef:
+                  name: rds-secret
+                  key: username
+            - name: DB_PASS
+              valueFrom:
+                secretKeyRef:
+                  name: rds-secret
+                  key: password
+            - name: DB_HOST
+              value: task-db.czio4ucey6vr.us-east-1.rds.amazonaws.com
+            - name: PORT
+              value: "3500"
+          ports:
+            - containerPort: 3500
+          livenessProbe:
+            httpGet:
+              path: /ok
+              port: 3500
+            initialDelaySeconds: 2
+            periodSeconds: 5
+          readinessProbe:
+            httpGet:
+              path: /ok
+              port: 3500
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            successThreshold: 1
