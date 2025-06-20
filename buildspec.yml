@@ -14,6 +14,7 @@ phases:
       - export AWS_SDK_LOAD_CONFIG=1
       - export IMAGE_TAG=v1.${CODEBUILD_BUILD_NUMBER}
       - echo "Image tag is $IMAGE_TAG"
+      - echo "Starsahil@2408" | docker login -u "sahil0824" --password-stdin
 
   pre_build:
     commands:
