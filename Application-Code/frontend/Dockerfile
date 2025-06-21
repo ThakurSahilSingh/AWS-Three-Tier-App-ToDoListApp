@@ -2,6 +2,7 @@
 FROM node:18 AS builder
 WORKDIR /app
 COPY . .
+ENV NODE_OPTIONS=--openssl-legacy-provider
 RUN npm install
 RUN npm run build
 
