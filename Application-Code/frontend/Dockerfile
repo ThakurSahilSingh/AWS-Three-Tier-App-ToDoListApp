@@ -1,6 +1,12 @@
-FROM node:14
-WORKDIR /usr/src/app
-COPY package*.json ./
-RUN npm install
+# Stage 1: Build React app
+FROM node:16 as build
+WORKDIR /app
 COPY . .
-CMD [ "npm", "start" ]
+RUN npm install
+RUN npm run build
+
+# Stage 2: Serve with Nginx
+FROM nginx:alpine
+COPY --from=build /app/build /usr/share/nginx/html
+EXPOSE 80
+CMD ["nginx", "-g", "daemon off;"]
