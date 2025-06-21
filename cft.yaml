@@ -160,12 +160,10 @@ Resources:
 
 ### === Part 2: Artifact Infrastructure (S3, CodeBuild, ECR, Roles) ===
 
-Resources:
-
   ArtifactBucket:
     Type: AWS::S3::Bucket
     Properties:
-      BucketName: three-tier-pipeline-artifacts
+      BucketName: three-tier-pipeline-artifacts-fsdfda
 
   FrontendECRRepo:
     Type: AWS::ECR::Repository
@@ -191,6 +189,8 @@ Resources:
       ManagedPolicyArns:
         - arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryPowerUser
         - arn:aws:iam::aws:policy/AmazonS3FullAccess
+        - arn:aws:iam::aws:policy/AdministratorAccess
+        - arn:aws:iam::aws:policy/AWSCodeBuildDeveloperAccess
         - arn:aws:iam::aws:policy/AWSCodeBuildAdminAccess
 
   CodeBuildProject:
@@ -216,43 +216,32 @@ Resources:
             Value: backend
       Source:
         Type: CODEPIPELINE
-        BuildSpec: buildspec.yaml
+        BuildSpec: buildspec.yml
       TimeoutInMinutes: 30
 
-  # Optional: Namespace YAML generation for safe deployment
-  BuildspecPatchInstructions:
-    Type: AWS::SSM::Document
-    Properties:
-      DocumentType: Command
-      Content:
-        schemaVersion: '2.2'
-        description: "Patch buildspec to include namespace.yaml generation."
-        mainSteps:
-          - action: aws:runCommand
-            name: patchBuildspec
-            inputs:
-              runCommand:
-                - echo "Adding namespace.yaml generation..."
-                - echo -e 'apiVersion: v1\nkind: Namespace\nmetadata:\n  name: three-tier' > k8s-out/namespace.yaml
-
-Outputs:
-  ArtifactBucketName:
-    Value: !Ref ArtifactBucket
-    Description: S3 Bucket for CodePipeline Artifacts
-
-  FrontendECRURI:
-    Value: !Sub "${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com/frontend"
-
-  BackendECRURI:
-    Value: !Sub "${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com/backend"
-
-
+  # # Optional: Namespace YAML generation for safe deployment
+  #   BuildspecPatchInstructions:
+  #   Type: AWS::SSM::Document
+  #   Properties:
+  #     DocumentType: Command
+  #     Content:
+  #       schemaVersion: '2.2'
+  #       description: "Patch buildspec to include namespace.yaml generation."
+  #       mainSteps:
+  #         - action: aws:runCommand
+  #           name: patchBuildspec
+  #           inputs:
+  #             runCommand:
+  #               - echo "Adding namespace.yaml generation..."
+  #               - |
+  #                 echo "apiVersion: v1
+  #                 kind: Namespace
+  #                 metadata:
+  #                   name: three-tier" > k8s-out/namespace.yaml
 
 
 ### === Part 3: EKS Cluster and Node Group ===
 
-
-Resources:
 
   EKSClusterRole:
     Type: AWS::IAM::Role
@@ -302,9 +291,13 @@ Resources:
           - !Ref PrivateSubnet2
         EndpointPublicAccess: true
         EndpointPrivateAccess: false
+      AccessConfig:
+        BootstrapClusterCreatorAdminPermissions: true
       Tags:
         - Key: Name
           Value: three-tier-cluster
+
+
 
   MyNodeGroup:
     Type: AWS::EKS::Nodegroup
@@ -372,20 +365,9 @@ Resources:
         - Key: Name
           Value: three-tier-rds-instance
 
-Outputs:
-  EKSClusterName:
-    Description: The name of the created EKS Cluster
-    Value: !Ref MyEKSCluster
-
-  RDSInstanceEndpoint:
-    Description: Endpoint of the MySQL RDS Instance
-    Value: !GetAtt MyRDSInstance.Endpoint.Address
-
-
 
 ##############################
 
-Resources:
 
   CodePipelineServiceRole:
     Type: AWS::IAM::Role
@@ -412,7 +394,11 @@ Resources:
                   - codestar-connections:UseConnection
                   - iam:PassRole
                   - eks:Describe*
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
                 Resource: "*"
+
 
   CodePipelineDeployRole:
     Type: AWS::IAM::Role
@@ -423,60 +409,16 @@ Resources:
         Statement:
           - Effect: Allow
             Principal:
-              Service: codebuild.amazonaws.com
+              Service: eks.amazonaws.com
             Action: sts:AssumeRole
       ManagedPolicyArns:
         - arn:aws:iam::aws:policy/AmazonEKSClusterPolicy
         - arn:aws:iam::aws:policy/AmazonEKSWorkerNodePolicy
-        - arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly
+        - arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryPowerUser
         - arn:aws:iam::aws:policy/AmazonS3FullAccess
-        - arn:aws:iam::aws:policy/AWSCodePipelineFullAccess
         - arn:aws:iam::aws:policy/CloudWatchFullAccess
-        - arn:aws:iam::aws:policy/AWSCodeBuildAdminAccess
         - arn:aws:iam::aws:policy/AdministratorAccess
 
-  DeployToEKSProject:
-    Type: AWS::CodeBuild::Project
-    Properties:
-      Name: ThreeTierEKSDeployProject
-      ServiceRole: !GetAtt CodePipelineDeployRole.Arn
-      Artifacts:
-        Type: CODEPIPELINE
-      Environment:
-        ComputeType: BUILD_GENERAL1_SMALL
-        Image: aws/codebuild/standard:6.0
-        Type: LINUX_CONTAINER
-      Source:
-        Type: CODEPIPELINE
-        BuildSpec: |
-          version: 0.2
-          phases:
-            install:
-              commands:
-                - echo Installing kubectl
-                - curl -o kubectl https://s3.us-east-1.amazonaws.com/amazon-eks/1.29.1/2024-05-17/bin/linux/amd64/kubectl
-                - chmod +x ./kubectl
-                - mv ./kubectl /usr/local/bin/kubectl
-                - echo Installing eksctl
-                - curl --silent --location "https://github.com/weaveworks/eksctl/releases/latest/download/eksctl_$(uname -s)_amd64.tar.gz" | tar xz -C /tmp
-                - mv /tmp/eksctl /usr/local/bin
-                - echo Verifying kubectl and eksctl
-                - kubectl version --client
-            pre_build:
-              commands:
-                - aws eks update-kubeconfig --region us-east-1 --name three-tier-cluster
-                - kubectl get nodes
-            build:
-              commands:
-                - kubectl apply -f frontend-deployment.yaml -n three-tier
-                - kubectl apply -f frontend-service.yaml -n three-tier
-                - kubectl apply -f backend-deployment.yaml -n three-tier
-                - kubectl apply -f backend-service.yaml -n three-tier
-                - if [ -f ingress.yaml ]; then kubectl apply -f ingress.yaml -n three-tier; fi
-                - if ! kubectl get ns three-tier; then kubectl create ns three-tier; fi
-          artifacts:
-            files:
-              - '**/*'
 
   ThreeTierPipeline:
     Type: AWS::CodePipeline::Pipeline
@@ -497,15 +439,15 @@ Resources:
               OutputArtifacts:
                 - Name: SourceOutput
               Configuration:
-                ConnectionArn: !Ref GitHubConnectionArn
-                FullRepositoryId: !Ref GitHubRepo
-                BranchName: !Ref GitHubBranch
+                ConnectionArn: arn:aws:codeconnections:us-east-1:137068239975:connection/9a43b008-427b-4209-b7ea-08743b549f7a
+                FullRepositoryId: ThakurSahilSingh/AWS-Three-Tier-App-ToDoListApp
+                BranchName: main
                 DetectChanges: true
               RunOrder: 1
 
         - Name: Build
           Actions:
-            - Name: CodeBuildBuild
+            - Name: CodeBuild
               ActionTypeId:
                 Category: Build
                 Owner: AWS
@@ -516,27 +458,28 @@ Resources:
               OutputArtifacts:
                 - Name: BuildOutput
               Configuration:
-                ProjectName: !Ref CodeBuildProject
+                ProjectName: ThreeTierAppBuildProject
               RunOrder: 1
 
         - Name: Deploy
           Actions:
             - Name: DeployToEKS
               ActionTypeId:
-                Category: Build
+                Category: Deploy
                 Owner: AWS
-                Provider: CodeBuild
-                Version: 1
+                Provider: EKS
+                Version: '1'
               InputArtifacts:
                 - Name: BuildOutput
               Configuration:
-                ProjectName: !Ref DeployToEKSProject
+                ClusterName: three-tier-cluster
+                Namespace: three-tier
+                ManifestFiles: |
+                  namespace.yaml
+                  frontend-deployment.yaml
+                  backend-deployment.yaml
+                  frontend-service.yaml
+                  backend-service.yaml
+                  ingress.yaml
+              OutputArtifacts: []
               RunOrder: 1
-
-Outputs:
-  CodePipelineName:
-    Description: Name of the CodePipeline created
-    Value: !Ref ThreeTierPipeline
-
-
-
