@@ -56,6 +56,7 @@ phases:
       - cp Kubernetes-Manifests-file/backend-service.yaml k8s-out/
 
       - cp Kubernetes-Manifests-file/ingress.yaml k8s-out/ || echo "No ingress.yaml found"
+      - cp Kubernetes-Manifests-file/secret.yaml k8s-out/ || echo "No secret.yaml found"
 
 artifacts:
   base-directory: k8s-out
@@ -66,3 +67,4 @@ artifacts:
     - frontend-service.yaml
     - backend-service.yaml
     - ingress.yaml
+    - secret.yaml
