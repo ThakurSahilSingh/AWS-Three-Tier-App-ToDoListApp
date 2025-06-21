@@ -31,4 +31,4 @@ spec:
             - name: REACT_APP_BACKEND_URL
               value: "/api/tasks"   # updated for Ingress proxying
           ports:
-            - containerPort: 3000
+            - containerPort: 80
