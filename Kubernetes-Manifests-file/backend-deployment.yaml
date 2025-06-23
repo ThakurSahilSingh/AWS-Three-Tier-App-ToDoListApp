@@ -39,9 +39,9 @@ spec:
                   name: rds-secret
                   key: password
             - name: DB_HOST
-              value: task-db.czio4ucey6vr.us-east-1.rds.amazonaws.com
+              value: three-tier-mysql.czio4ucey6vr.us-east-1.rds.amazonaws.com
             - name: PORT
-              value: "3500"
+              value: "3500"  # Port your Express app listens on
           ports:
             - containerPort: 3500
           livenessProbe:

@@ -14,7 +14,7 @@ class Tasks extends Component {
             const { data } = await getTasks();
             this.setState({ tasks: data });
         } catch (error) {
-            console.log(error);
+            console.log("API ERROR:", error);
         }
     }
 
@@ -27,44 +27,78 @@ class Tasks extends Component {
         const originalTasks = this.state.tasks;
         try {
             const { data } = await addTask({ task: this.state.currentTask });
-            const tasks = originalTasks;
-            tasks.push(data);
+            const tasks = [...originalTasks, data];
             this.setState({ tasks, currentTask: "" });
         } catch (error) {
-            console.log(error);
+            console.log("ADD ERROR:", error);
         }
     };
 
-    handleUpdate = async (currentTask) => {
+    handleUpdate = async (id) => {
         const originalTasks = this.state.tasks;
         try {
             const tasks = [...originalTasks];
-            const index = tasks.findIndex((task) => task._id === currentTask);
+            const index = tasks.findIndex((task) => task._id === id);
             tasks[index] = { ...tasks[index] };
             tasks[index].completed = !tasks[index].completed;
             this.setState({ tasks });
-            await updateTask(currentTask, {
+            await updateTask(id, {
                 completed: tasks[index].completed,
             });
         } catch (error) {
             this.setState({ tasks: originalTasks });
-            console.log(error);
+            console.log("UPDATE ERROR:", error);
         }
     };
 
-    handleDelete = async (currentTask) => {
+    handleDelete = async (id) => {
         const originalTasks = this.state.tasks;
         try {
-            const tasks = originalTasks.filter(
-                (task) => task._id !== currentTask
-            );
+            const tasks = originalTasks.filter((task) => task._id !== id);
             this.setState({ tasks });
-            await deleteTask(currentTask);
+            await deleteTask(id);
         } catch (error) {
             this.setState({ tasks: originalTasks });
-            console.log(error);
+            console.log("DELETE ERROR:", error);
         }
     };
+
+    render() {
+        return (
+            <div className="container">
+                <h2>TO-DO List</h2>
+                <form onSubmit={this.handleSubmit}>
+                    <input
+                        type="text"
+                        value={this.state.currentTask}
+                        onChange={this.handleChange}
+                        placeholder="Enter task..."
+                    />
+                    <button type="submit">Add Task</button>
+                </form>
+                <ul>
+                    {this.state.tasks.map((task) => (
+                        <li key={task._id}>
+                            <span
+                                style={{
+                                    textDecoration: task.completed
+                                        ? "line-through"
+                                        : "none",
+                                    cursor: "pointer",
+                                }}
+                                onClick={() => this.handleUpdate(task._id)}
+                            >
+                                {task.task}
+                            </span>
+                            <button onClick={() => this.handleDelete(task._id)}>
+                                ❌
+                            </button>
+                        </li>
+                    ))}
+                </ul>
+            </div>
+        );
+    }
 }
 
 export default Tasks;

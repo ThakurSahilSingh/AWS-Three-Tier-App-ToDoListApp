@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: mysql-client
+  namespace: three-tier
+spec:
+  containers:
+  - name: mysql-client
+    image: mysql:8
+    command: ["sleep"]
+    args: ["3600"]
+  restartPolicy: Never
