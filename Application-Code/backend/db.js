@@ -20,61 +20,33 @@
 // module.exports = { sequelize, connectDB };
 
 
-const mysql = require("mysql2");
+const { Sequelize } = require('sequelize');
  
-// Create a connection pool. This is more efficient and robust for web applications.
-
-const pool = mysql.createPool({
-
-    host: process.env.DB_HOST,       // Your RDS instance endpoint
-
-    user: process.env.DB_USER,       // Your RDS master username
-
-    password: process.env.DB_PASS,   // Your RDS master password
-
-    database: process.env.DB_NAME,   // The name of the database to use
-
-    waitForConnections: true,
-
-    connectionLimit: 10, // Default is 10, adjust as needed
-
-    queueLimit: 0
-
-});
- 
-// We export a promise-based version of the pool for use with async/await
-
-const promisePool = pool.promise();
- 
-// Function to test the connection
-
-const connectDB = async () => {
-
-    try {
-
-        // Get a connection from the pool to test it
-
-        const connection = await promisePool.getConnection();
-
-        console.log("Successfully connected to the RDS MySQL database.");
-
-        // Release the connection back to the pool
-
-        connection.release();
-
-    } catch (error) {
-
-        console.error("Could not connect to the database.", error);
-
-        // Exit the process with failure if the database connection fails
-
-        process.exit(1);
-
+// Create a new Sequelize instance.
+// It will read the connection details from environment variables.
+const sequelize = new Sequelize(
+    process.env.DB_NAME,    // The name of the database
+    process.env.DB_USER,    // The username for the database
+    process.env.DB_PASS,    // The password for the database
+    {
+        host: process.env.DB_HOST, // The RDS instance endpoint
+        dialect: 'mysql',
+        logging: false, // Set to console.log to see generated SQL queries
     }
-
+);
+ 
+// Function to test the database connection
+const connectDB = async () => {
+    try {
+        await sequelize.authenticate();
+        console.log('Successfully connected to the RDS MySQL database using Sequelize.');
+    } catch (error) {
+        // Log the specific error and exit. This is crucial for Kubernetes to restart a faulty pod.
+        console.error('Could not connect to the database:', error);
+        process.exit(1); // Exit with a failure code
+    }
 };
  
-// Export the connection test function and the pool itself
-
-module.exports = { connectDB, db: promisePool };
- 
+// Export the test function and the sequelize instance itself
+// The instance will be used by your models to define tables and run queries.
+module.exports = { connectDB, db: sequelize };
